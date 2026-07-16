@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enfoque Pomodoro+</title>
+<style>
+  :root {
+    --bg: #12131a;
+    --panel: #1c1e2a;
+    --panel-2: #232636;
+    --text: #e8eaf2;
+    --muted: #8a8fa8;
+    --accent: #ff6b6b;
+    --accent-break: #4ecdc4;
+    --accent-long: #a78bfa;
+    --ring-track: #2c3042;
+    --radius: 16px;
+    font-size: 16px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+  .app { width: 100%; max-width: 460px; }
+
+  h1 {
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin-bottom: 1.2rem;
+  }
+  h1 span { color: var(--accent); }
+
+  .modes {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+  .modes button {
+    background: var(--panel);
+    border: 1px solid transparent;
+    color: var(--muted);
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .modes button.active { color: var(--text); border-color: var(--mode-color, var(--accent)); }
+
+  .timer-wrap {
+    position: relative;
+    width: 260px;
+    height: 260px;
+    margin: 0 auto 1.5rem;
+  }
+  .timer-wrap svg { transform: rotate(-90deg); }
+  .ring-track { fill: none; stroke: var(--ring-track); stroke-width: 10; }
+  .ring-progress {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 10;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.5s linear, stroke 0.3s;
+  }
+  .timer-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+  }
+  #time {
+    font-size: 3.2rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  #phase-label { color: var(--muted); font-size: 0.9rem; }
+
+  .controls {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-bottom: 2rem;
+  }
+  .controls button {
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 1.6rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s, filter 0.2s;
+  }
+  .controls button:active { transform: scale(0.96); }
+  #start-btn { background: var(--accent); color: #fff; min-width: 130px; }
+  #start-btn.running { background: var(--panel-2); color: var(--text); }
+  #reset-btn, #skip-btn { background: var(--panel); color: var(--muted); }
+  #reset-btn:hover, #skip-btn:hover { color: var(--text); }
+
+  .section {
+    background: var(--panel);
+    border-radius: var(--radius);
+    padding: 1.2rem;
+    margin-bottom: 1.2rem;
+  }
+  .section h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.9rem;
+  }
+
+  .task-form { display: flex; gap: 0.5rem; margin-bottom: 0.8rem; }
+  .task-form input {
+    flex: 1;
+    background: var(--panel-2);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 0.6rem 0.8rem;
+    color: var(--text);
+    font-size: 0.95rem;
+    outline: none;
+  }
+  .task-form input:focus { border-color: var(--accent); }
+  .task-form button {
+    background: var(--panel-2);
+    border: none;
+    border-radius: 10px;
+    color: var(--accent);
+    font-size: 1.3rem;
+    width: 42px;
+    cursor: pointer;
+  }
+
+  #task-list { list-style: none; display: flex; flex-direction: column; gap: 0.4rem; }
+  #task-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--panel-2);
+    border-radius: 10px;
+    padding: 0.55rem 0.75rem;
+  }
+  #task-list li.done .task-text { text-decoration: line-through; color: var(--muted); }
+  .task-check {
+    width: 20px; height: 20px;
+    accent-color: var(--accent-break);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .task-text { flex: 1; font-size: 0.95rem; word-break: break-word; }
+  .task-del {
+    background: none; border: none;
+    color: var(--muted); cursor: pointer;
+    font-size: 1.1rem; padding: 0 0.2rem;
+  }
+  .task-del:hover { color: var(--accent); }
+  .empty-msg { color: var(--muted); font-size: 0.9rem; text-align: center; padding: 0.4rem; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.6rem;
+    text-align: center;
+  }
+  .stat {
+    background: var(--panel-2);
+    border-radius: 10px;
+    padding: 0.8rem 0.4rem;
+  }
+  .stat .num { font-size: 1.5rem; font-weight: 700; }
+  .stat .lbl { font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem; }
+
+  footer { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top: 0.5rem; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>🍅 Enfoque <span>Pomodoro+</span></h1>
+
+  <div class="modes">
+    <button data-mode="work" class="active">Trabajo</button>
+    <button data-mode="short">Descanso corto</button>
+    <button data-mode="long">Descanso largo</button>
+  </div>
+
+  <div class="timer-wrap">
+    <svg width="260" height="260" viewBox="0 0 260 260">
+      <circle class="ring-track" cx="130" cy="130" r="118"></circle>
+      <circle class="ring-progress" id="ring" cx="130" cy="130" r="118"></circle>
+    </svg>
+    <div class="timer-center">
+      <div id="time">25:00</div>
+      <div id="phase-label">Listo para enfocarte</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="start-btn">Iniciar</button>
+    <button id="reset-btn" title="Reiniciar fase">Reiniciar</button>
+    <button id="skip-btn" title="Saltar a la siguiente fase">Saltar ⏭</button>
+  </div>
+
+  <div class="section">
+    <h2>Tareas de hoy</h2>
+    <form class="task-form" id="task-form">
+      <input id="task-input" type="text" maxlength="120" placeholder="¿En qué vas a trabajar?" autocomplete="off">
+      <button type="submit" title="Agregar tarea">+</button>
+    </form>
+    <ul id="task-list"></ul>
+  </div>
+
+  <div class="section">
+    <h2>Estadísticas de hoy</h2>
+    <div class="stats-grid">
+      <div class="stat"><div class="num" id="stat-pomos">0</div><div class="lbl">Pomodoros</div></div>
+      <div class="stat"><div class="num" id="stat-mins">0</div><div class="lbl">Min. enfocado</div></div>
+      <div class="stat"><div class="num" id="stat-tasks">0</div><div class="lbl">Tareas hechas</div></div>
+    </div>
+  </div>
+
+  <footer>Los datos se guardan solo en este navegador. Ciclo: 4 pomodoros → descanso largo.</footer>
+</div>
+
+<script>
+(() => {
+  const DURATIONS = { work: 25 * 60, short: 5 * 60, long: 15 * 60 };
+  const COLORS = { work: "#ff6b6b", short: "#4ecdc4", long: "#a78bfa" };
+  const LABELS = {
+    work: "Hora de enfocarse",
+    short: "Descanso corto",
+    long: "Descanso largo",
+    idle: { work: "Listo para enfocarte", short: "Estira las piernas", long: "Te lo has ganado" }
+  };
+  const CIRC = 2 * Math.PI * 118;
+
+  const $ = id => document.getElementById(id);
+  const ring = $("ring"), timeEl = $("time"), phaseEl = $("phase-label"),
+        startBtn = $("start-btn"), modeBtns = document.querySelectorAll(".modes button");
+
+  let mode = "work";
+  let remaining = DURATIONS.work;
+  let running = false;
+  let timerId = null;
+  let endAt = 0;
+  let pomosInCycle = 0;
+
+  // ---- Persistencia ----
+  const todayKey = () => "pomo-stats-" + new Date().toISOString().slice(0, 10);
+  const loadStats = () => JSON.parse(localStorage.getItem(todayKey()) || '{"pomos":0,"mins":0,"tasksDone":0}');
+  const saveStats = s => localStorage.setItem(todayKey(), JSON.stringify(s));
+  const loadTasks = () => JSON.parse(localStorage.getItem("pomo-tasks") || "[]");
+  const saveTasks = t => localStorage.setItem("pomo-tasks", JSON.stringify(t));
+
+  let stats = loadStats();
+  let tasks = loadTasks();
+
+  // ---- Sonido (WebAudio, sin archivos) ----
+  function beep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.25, 0.5].forEach((delay, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 660 + i * 110;
+        gain.gain.setValueAtTime(0.001, ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + delay + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.2);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.22);
+      });
+    } catch (e) { /* sin audio disponible */ }
+  }
+
+  // ---- Render ----
+  function fmt(s) {
+    const m = Math.floor(s / 60), sec = s % 60;
+    return String(m).padStart(2, "0") + ":" + String(sec).padStart(2, "0");
+  }
+
+  function render() {
+    timeEl.textContent = fmt(remaining);
+    document.title = (running ? fmt(remaining) + " · " : "") + "Enfoque Pomodoro+";
+    const frac = remaining / DURATIONS[mode];
+    ring.style.strokeDasharray = CIRC;
+    ring.style.strokeDashoffset = CIRC * (1 - frac);
+    ring.style.stroke = COLORS[mode];
+    phaseEl.textContent = running ? LABELS[mode] : LABELS.idle[mode];
+    startBtn.textContent = running ? "Pausar" : "Iniciar";
+    startBtn.classList.toggle("running", running);
+    modeBtns.forEach(b => {
+      b.classList.toggle("active", b.dataset.mode === mode);
+      b.style.setProperty("--mode-color", COLORS[b.dataset.mode]);
+    });
+  }
+
+  function renderStats() {
+    $("stat-pomos").textContent = stats.pomos;
+    $("stat-mins").textContent = stats.mins;
+    $("stat-tasks").textContent = stats.tasksDone;
+  }
+
+  function renderTasks() {
+    const ul = $("task-list");
+    ul.innerHTML = "";
+    if (!tasks.length) {
+      ul.innerHTML = '<li class="empty-msg" style="background:none">Sin tareas aún — agrega una arriba ☝️</li>';
+      return;
+    }
+    tasks.forEach((t, i) => {
+      const li = document.createElement("li");
+      if (t.done) li.classList.add("done");
+      const check = document.createElement("input");
+      check.type = "checkbox";
+      check.className = "task-check";
+      check.checked = t.done;
+      check.addEventListener("change", () => {
+        t.done = check.checked;
+        stats.tasksDone += t.done ? 1 : -1;
+        if (stats.tasksDone < 0) stats.tasksDone = 0;
+        saveTasks(tasks); saveStats(stats);
+        renderTasks(); renderStats();
+      });
+      const span = document.createElement("span");
+      span.className = "task-text";
+      span.textContent = t.text;
+      const del = document.createElement("button");
+      del.className = "task-del";
+      del.textContent = "✕";
+      del.title = "Eliminar";
+      del.addEventListener("click", () => {
+        tasks.splice(i, 1);
+        saveTasks(tasks);
+        renderTasks();
+      });
+      li.append(check, span, del);
+      ul.appendChild(li);
+    });
+  }
+
+  // ---- Temporizador ----
+  function tick() {
+    remaining = Math.max(0, Math.round((endAt - Date.now()) / 1000));
+    render();
+    if (remaining <= 0) finishPhase();
+  }
+
+  function start() {
+    running = true;
+    endAt = Date.now() + remaining * 1000;
+    timerId = setInterval(tick, 250);
+    render();
+  }
+
+  function pause() {
+    running = false;
+    clearInterval(timerId);
+    render();
+  }
+
+  function setMode(m, autostart = false) {
+    pause();
+    mode = m;
+    remaining = DURATIONS[m];
+    render();
+    if (autostart) start();
+  }
+
+  function finishPhase() {
+    pause();
+    beep();
+    if (mode === "work") {
+      stats.pomos++;
+      stats.mins += DURATIONS.work / 60;
+      saveStats(stats);
+      renderStats();
+      pomosInCycle++;
+      setMode(pomosInCycle % 4 === 0 ? "long" : "short");
+    } else {
+      setMode("work");
+    }
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("🍅 Pomodoro+", { body: LABELS.idle[mode] });
+    }
+  }
+
+  // ---- Eventos ----
+  startBtn.addEventListener("click", () => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+    running ? pause() : start();
+  });
+  $("reset-btn").addEventListener("click", () => setMode(mode));
+  $("skip-btn").addEventListener("click", () => finishPhase());
+  modeBtns.forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
+
+  $("task-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const input = $("task-input");
+    const text = input.value.trim();
+    if (!text) return;
+    tasks.push({ text, done: false });
+    saveTasks(tasks);
+    input.value = "";
+    renderTasks();
+  });
+
+  render(); renderStats(); renderTasks();
+})();
+</script>
+</body>
+</html>
