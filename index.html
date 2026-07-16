@@ -343,6 +343,11 @@
       del.textContent = "✕";
       del.title = "Eliminar";
       del.addEventListener("click", () => {
+        if (t.done) {
+          stats.tasksDone = Math.max(0, stats.tasksDone - 1);
+          saveStats(stats);
+          renderStats();
+        }
         tasks.splice(i, 1);
         saveTasks(tasks);
         renderTasks();
